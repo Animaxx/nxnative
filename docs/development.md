@@ -307,6 +307,14 @@ The game's own work and its frame rate stay as they are; the host avoids work of
 - **Graphics:** characters are skinned with transform feedback, the colour grading LUT is drawn as a layered pass, the deferred lighting reads stencil through a stencil-mode texture view, and the occlusion queries that decide how characters are animated need the draw's base instance in the driver segment ([04](agents/04-graphics.md)).
 - **Mac input:** a fresh save reaches play in Lumiose City with `DM_KBD=Taylor DM_KEYS="f450:A,f1200:LRight~1,f1600:A,f1900:Down,f2000:Down,f2100:A,f2400:A*80/90"`; a save made there continues with `DM_KEYS="f300:A*3/150"` (play from about frame 600), and `LUp~12` then walks along the platform.
 
+**Cuphead (`0100A5C00D162000`)**
+- **Status:** brought up on the Mac with no host change: title, save slots, the opening storybook, Elder Kettle's house, Inkwell Isle One and Forest Follies at 60 fps with no red line; playable on an iPhone.
+- **Engine:** Unity 2017.4.9f1 IL2CPP, SDK 5.5.0 (the oldest so far, NVN API 53.313), update 1.3.7 (v655360); its DLC (The Delicious Last Course) is mounted as add-on content 1. Unity 2017.4's serialized and `Shader` formats (`unityfs.py`, `shader_split.py`) and the rewriter's jump-table form (`patch_nso.py`) were found by armyja on this game (GitHub pull requests #1, #2).
+- **Shaders:** 3,118 (1,558 pixel, 1,560 vertex) from the player's serialized files and AssetBundles, plus 4 GLSLC outputs in `main`. Every binding decodes.
+- **Memory:** no system resource, so no virtual address memory: Unity sets a 3.12 GB heap (application pool − used memory) in a 4 GB block. The rewritten modules take 80 MB, so the profile reports 84 MB of used memory (`mem_used`); with the default 64 MB, `SetHeapSize` fails and the game aborts at its first allocation. On the Mac about 3.2 GB resident and 2.7 GB of Metal allocations, flat over the house and the map.
+- **Saves:** the game writes a slot when it reaches the map, not when the slot is picked.
+- **Mac input:** a fresh save goes through the title (L+R), a new slot, the storybook and the house to the map with `DM_KEYS="20:L+R,26:A,32:A,38:A,44:A,50:A,56:A*20/3,120:LRight~4,125:A,127:LRight~3,131:A*10/2,152:LLeft~3,155.5:A"` (the map at about 160 s). From that save, `DM_KEYS="20:L+R,26:A,32:A,35:A,40:LRight~1.5,42:LDown~1.5,45:LRight~3,49:LUp~1,51:LRight~3,54.5:LLeft~0.5,55.2:LUp~0.25,55.6:LRight~2,58:LUp~0.2,58.4:LRight~0.25,58.8:LUp~0.2,59.2:LRight~0.25,59.6:LUp~0.2,60:LRight~0.25,60.4:LUp~0.2,61:A,63:A"` crosses the bridge (its entry is narrow between the posts) and enters Forest Follies (play from about 68 s; Y shoots).
+
 ## Tools (`dm/tools`)
 
 | Tool | What it does |
