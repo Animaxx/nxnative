@@ -77,6 +77,88 @@ The game language (`--language`, `LANGUAGE`; English by default) is what `nn::oe
 
 On the device, environment switches go in `Documents/env.txt` (one `KEY=VALUE` per line), and game files are also accepted at `Documents/romfs`.
 
+## Build and run on a device with Xcode
+
+Use your Apple developer account directly in Xcode:
+
+```
+python3 scripts/build_ipa_from_nsp.py "<NSP folder>" -k "<prod.keys>" --prepare-xcode
+open "<NSP parent folder>/NxNative.xcworkspace"
+```
+
+`--prepare-xcode` (`PREPARE_XCODE = True` in Spyder) runs the same extraction, rewrite and shader preparation, reusing unchanged outputs, then stops after generating the project. It does not build an IPA, sign, or install. It requires keeping the extracted files: do not combine it with `--no-keep-extracted`.
+
+1. In **Xcode > Settings > Apple Accounts**, add your Apple developer account.
+2. Open the **DmIOS** target's **Signing & Capabilities**, enable **Automatically manage signing**, and select your team, replacing the generated placeholder. If Xcode reports that the bundle identifier is unavailable, choose an identifier you own (or pass `--bundle-id` when preparing).
+3. Connect and trust your iPhone or iPad, enable **Developer Mode** on the device, and select it as the run destination. This project needs a physical device; the iOS Simulator cannot run the game's code.
+4. Select the game's scheme, named **Game name (title ID)**, and press **Run**. Its Run configuration is **Release**. Xcode manages provisioning, signs the completed app and installs it on your device.
+
+Each game has its own generated project at `<NSP folder>/<title ID>_build/xcode/DmIOS.xcodeproj`. Its **Copy game resources** target phase runs before code signing. `Gen/resources.env` inside that project's folder holds the current extraction's RomFS path, the active iOS shader library directory and optional DLC path. The phase syncs them to `DmIOS.app/romfs`, `DmIOS.app/msl/<chain, vk or gl>`, and `DmIOS.app/aoc`. The rewritten game code is embedded by `Gen/embed.S` at link time. No keys are copied to the device. Source links point at this repository, so code edits apply to all prepared games without duplicating the repository.
+
+The first Xcode build copies the complete game, so allow enough free space on the game's drive for another uncompressed copy. Later builds sync changes. Generated workspace settings put derived data and build products under `<NSP folder>/<title ID>_build/xcode-derived-data/`; keep that drive connected while building. The installed app contains its files and runs independently of the Mac.
+
+### Switch between several games
+
+Prepare each supported game once, using a different bundle ID for each app:
+
+```
+python3 scripts/build_ipa_from_nsp.py "<games>/Engage" -k "<prod.keys>" --prepare-xcode --bundle-id com.yourname.nxnative.engage
+python3 scripts/build_ipa_from_nsp.py "<games>/MarioGalaxy" -k "<prod.keys>" --prepare-xcode --bundle-id com.yourname.nxnative.galaxy
+open "<games>/NxNative.xcworkspace"
+```
+
+In Xcode, select the desired game's scheme and the device, then Run. Each app has its own game code, resources, build products, bundle ID and on-device saves. Different bundle IDs let the games stay installed together. Keep the same ID when updating an installed game; changing its ID creates a separate app with separate data. The script rejects a bundle ID already used by another project in this workspace.
+
+Re-preparing one game refreshes only that game's generated project, leaving the other projects registered. It preserves that project's Release bundle ID and team, including changes made in Xcode. Explicit `--bundle-id` and `--team-id` values override them. `BUNDLE_ID` and `TEAM_ID` settings in Spyder, and the `DM_TEAM_ID` environment variable, also override saved values. On the first run, select your team in Xcode or pass `--team-id YOURTEAMID`. Other manual project edits can be replaced during regeneration; edit `dm/ios/project.yml` for shared changes.
+
+When game folders have different parents, pass the same `--xcode-workspace "/external/drive/NxNative.xcworkspace"` for each game to collect them in one workspace (`XCODE_WORKSPACE` in Spyder). The default workspace sits beside the NSP folder; workspace caches stay beside it, while each game's build products remain under its own `<title ID>_build/xcode-derived-data/`. There is no need to rerun the preparation script just to switch among games already prepared; rerun it after changing the game files, profile, shaders or project template.
+
+The normal unsigned IPA command still uses the repository's `dm/ios/DmIOS.xcodeproj`, overrides `DM_COPY_GAME_RESOURCES=NO` only for its own build, and packs resources directly from the drive as before. It does not change the separate projects in the workspace.
+
+### Configure a game library
+
+For a reusable developer setup, copy `games.example.toml` to the drive holding your games as `games.local.toml`. Edit this local file rather than Python settings or generated Xcode projects. Use Python 3.12 or later and the same virtual environment and dependencies as the main script (including `backports.zstd` before Python 3.14; see the README's prerequisites).
+
+```toml
+version = 1
+
+[defaults]
+keys = "keys/prod.keys"
+workspace = "NxNative.xcworkspace"
+# team_id = "ABCDEFGHIJ" # optional; you can select your team in Xcode instead
+
+[games.engage]
+path = "Fire Emblem Engage"
+bundle_id = "com.yourname.nxnative.engage"
+
+[games.wonder]
+path = "Super Mario Bros. Wonder"
+bundle_id = "com.yourname.nxnative.wonder"
+```
+
+Paths are relative to the configuration file, independent of the terminal's current directory. Absolute paths, `~` and environment variables such as `$SWITCH_GAMES` also work. Keep the configuration on the games drive; `games.local.toml` is also ignored by Git if kept in the repository. Store only the key file's path here, never its contents.
+
+From this repository, run:
+
+```sh
+export NXNATIVE_CONFIG="/external/games/games.local.toml"
+python3 scripts/prepare_games.py list
+python3 scripts/prepare_games.py check
+python3 scripts/prepare_games.py prepare engage
+# Prepare several aliases, or explicitly every configured game:
+python3 scripts/prepare_games.py prepare engage wonder
+python3 scripts/prepare_games.py prepare --all
+open "/external/games/NxNative.xcworkspace"
+```
+
+Alternatively, pass `--config "/external/games/games.local.toml"` before the action on each command. `list` works with the drive disconnected. `check` checks the selected input paths and shows the commands it would run; it does not read key contents, extract games, or verify game versions. Preparation reuses `build_ipa_from_nsp.py` for title detection, profile/version checks, extraction, rewriting, shaders and project generation. All selected paths are checked before preparation starts; a failed game stops the batch. A new configuration entry does not guarantee compatibility for an unsupported title or an untested update; see **Port another game** below.
+
+Per-game optional fields are `keys` (overrides the shared key path), `team_id` (overrides the shared team), `bundle_id`, `app_name` and `package` (an NSP container version such as `v327680`, not a display version such as `2.0.0`). Omit optional fields rather than setting empty strings. With no `package`, the newest version in the folder is selected. With no `bundle_id` or team, the existing project selection is preserved, with the same fallback behavior as the main script. Configured IDs and teams are explicit overrides on every preparation; edit the config if you want to change them. Each game needs its own folder and bundle ID. Duplicate folders and explicit IDs are rejected before preparation.
+
+To add a game, add another `[games.<alias>]` table and prepare that alias. Xcode then has another game scheme in the shared workspace. Switching among prepared games needs only a scheme change and **Run**. Each project links to this repository's sources and keeps its generated files and build products on its game's drive. Each developer uses their own local paths and Apple account. The launcher prepares projects; you sign and install through Xcode.
+
+In Spyder, open `scripts/prepare_games.py`, set `CONFIG_FILE`, `ACTION`, and `SELECTED_GAMES` (or `ALL_GAMES`), then press F5. Command-line arguments in the run configuration override those settings.
+
 ## Port another game
 
 Each game has a profile in `dm/games/<id>/`:
@@ -124,13 +206,13 @@ GAME=$G W=$W dm/ios/tools/build_ipa.sh [out.ipa]
 
 Notes on these steps:
 - `dmsh_build.py` compiles each shader's Metal source through a cache keyed by that source, the compile flags and the compiler (`dm/gfx/tools/dmsh_mtlcache.py`, in `<cache>/cas/metallib/`). A chain change that leaves a shader's MSL unchanged, such as a translator fix, costs that shader no Metal compile. Before building, the cache takes the libraries of the earlier `b-*/` folders beside its output (and beside `IOSOUT`), and of `DMSH_PREFILL=<Mac root>[=<iOS root>]` (several separated by `:`). It takes a folder only when its recorded flags are the current ones and a fresh compile of a few of its shaders reproduces their libraries byte for byte. The summary line `Metal cache:` shows reused, compiled and filled counts per target.
-- `build_ipa.sh` takes the rewritten modules from `$W/build/patched_<package>` and the RomFS from `$W/data/<package>/RomFS`; `PATCHED` and `ROMFS` override them. The shader libraries, the RomFS and the add-on content never go through Xcode: `pack_ipa.py` packs them into the IPA beside the app Xcode built, as `DmIOS.app/msl/b-<chain version>`, `romfs` and `aoc`.
+- `build_ipa.sh` takes the rewritten modules from `$W/build/patched_<package>` and the RomFS from `$W/data/<package>/RomFS`; `PATCHED` and `ROMFS` override them. In unsigned IPA mode, `pack_ipa.py` packs the shader libraries, RomFS and add-on content beside the app Xcode built, as `DmIOS.app/msl/b-<chain version>`, `romfs` and `aoc`. Prepared Xcode projects instead sync these resources into the app before signing.
 - It also bundles a standard font (macOS's Arial Unicode, `STD_FONT=` overrides it) and the generated `nintendo_ext.ttf`.
 - The icon is the `icon.jpg` that `nx_extract` saves next to `RomFS/`; `DM_ICON=` points at another image.
 - `DM_ENV_FILE=` bakes environment switches into the app, and `DM_DISPLAY_NAME=` renames it.
 - `DM_LANG=<code>` is the game language (`DMLanguage` in `Info.plist`, default `en-US`; `main.m` sets `DM_LANG` from it unless `Documents/env.txt` or the baked env file sets it).
 - `DM_SHOW_FPS=1` turns the frame-rate counter on (`DMShowFPS` in `Info.plist`, which `front_ios.m` reads; `DM_SHOW_FPS` in `Documents/env.txt` overrides it). It counts the frames put on screen each second (`mtl_present_count`), so frames the display link merges away are not counted.
-- If Xcode's Locations setting puts products in a custom place, the script finds the app through the build log.
+- The unsigned build pins its build product and intermediate directories inside `$W/build/ios/pkg/dd`, independently of Xcode's Locations preference.
 - hactool cannot read every update (Mario 1.2.1's patch NCA gives "Invalid BKTR layout!"), which is why `nx_extract` uses LibHac.
 
 ## Prewarm lists
