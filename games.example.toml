@@ -1,0 +1,29 @@
+# Copy this file to the drive holding your games, then edit the paths there.
+# Keep local paths and keys out of version control. No key contents belong here.
+# Python 3.12+; use the same venv and dependencies as build_ipa_from_nsp.py.
+version = 1
+
+[defaults]
+# Paths are relative to this TOML file, or absolute. ~ and $ENV_VAR are expanded.
+keys = "keys/prod.keys"
+workspace = "NxNative.xcworkspace"
+# Optional: omit to preserve each project's team or select it in Xcode.
+# team_id = "ABCDEFGHIJ"
+
+[games.engage]
+path = "Fire Emblem Engage"
+# Optional: omit to preserve the Xcode ID or use org.nxnative.<title ID>.
+bundle_id = "com.yourname.nxnative.engage"
+# Optional: per-game keys override defaults.keys.
+# keys = "other-keys/prod.keys"
+# Optional: package is the NSP container version, not the display version.
+# package = "v327680"
+# app_name = "Fire Emblem Engage"
+
+[games.wonder]
+path = "Super Mario Bros. Wonder"
+bundle_id = "com.yourname.nxnative.wonder"
+
+# Add another [games.<alias>] with its path and optional unique bundle_id.
+# Each folder holds one base game and optional updates and DLC.
+# This configuration selects inputs; it does not add support for a new game.

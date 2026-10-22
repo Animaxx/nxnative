@@ -103,6 +103,50 @@ Each prepared game is a scheme in the shared workspace (by default `NxNative.xcw
 
 The unsigned IPA build still uses the repository's `dm/ios/DmIOS.xcodeproj`, skips the resource phase (`DM_COPY_GAME_RESOURCES=NO`) and packs the resources straight from the drive as before.
 
+### Configure a game library
+
+For a reusable developer setup, copy `games.example.toml` to the drive holding your games as `games.local.toml`. Edit this local file rather than Python settings or generated Xcode projects. Use Python 3.12 or later and the same virtual environment and dependencies as the main script (including `backports.zstd` before Python 3.14; see the README's prerequisites).
+
+```toml
+version = 1
+
+[defaults]
+keys = "keys/prod.keys"
+workspace = "NxNative.xcworkspace"
+# team_id = "ABCDEFGHIJ" # optional; you can select your team in Xcode instead
+
+[games.engage]
+path = "Fire Emblem Engage"
+bundle_id = "com.yourname.nxnative.engage"
+
+[games.wonder]
+path = "Super Mario Bros. Wonder"
+bundle_id = "com.yourname.nxnative.wonder"
+```
+
+Paths are relative to the configuration file, independent of the terminal's current directory. Absolute paths, `~` and environment variables such as `$SWITCH_GAMES` also work. Keep the configuration on the games drive; `games.local.toml` is also ignored by Git if kept in the repository. Store only the key file's path here, never its contents.
+
+From this repository, run:
+
+```sh
+export NXNATIVE_CONFIG="/external/games/games.local.toml"
+python3 scripts/prepare_games.py list
+python3 scripts/prepare_games.py check
+python3 scripts/prepare_games.py prepare engage
+# Prepare several aliases, or explicitly every configured game:
+python3 scripts/prepare_games.py prepare engage wonder
+python3 scripts/prepare_games.py prepare --all
+open "/external/games/NxNative.xcworkspace"
+```
+
+Alternatively, pass `--config "/external/games/games.local.toml"` before the action on each command. `list` works with the drive disconnected. `check` checks the selected input paths and shows the commands it would run; it does not read key contents, extract games, or verify game versions. Preparation reuses `build_ipa_from_nsp.py` for title detection, profile/version checks, extraction, rewriting, shaders and project generation. All selected paths are checked before preparation starts; a failed game stops the batch. A new configuration entry does not guarantee compatibility for an unsupported title or an untested update; see **Port another game** below.
+
+Per-game optional fields are `keys` (overrides the shared key path), `team_id` (overrides the shared team), `bundle_id`, `app_name` and `package` (an NSP container version such as `v327680`, not a display version such as `2.0.0`). Omit optional fields rather than setting empty strings. With no `package`, the newest version in the folder is selected. With no `bundle_id` or team, the existing project selection is preserved, with the same fallback behavior as the main script. Configured IDs and teams are explicit overrides on every preparation; edit the config if you want to change them. Each game needs its own folder and bundle ID. Duplicate folders and explicit IDs are rejected before preparation.
+
+To add a game, add another `[games.<alias>]` table and prepare that alias. Xcode then has another game scheme in the shared workspace. Switching among prepared games needs only a scheme change and **Run**. Each project links to this repository's sources and keeps its generated files and build products on its game's drive. Each developer uses their own local paths and Apple account. The launcher prepares projects; you sign and install through Xcode.
+
+In Spyder, open `scripts/prepare_games.py`, set `CONFIG_FILE`, `ACTION`, and `SELECTED_GAMES` (or `ALL_GAMES`), then press F5. Command-line arguments in the run configuration override those settings.
+
 ## Port another game
 
 Each game has a profile in `dm/games/<id>/`:
