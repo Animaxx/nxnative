@@ -91,6 +91,10 @@ The IPA appears in the same folder (here `~/Games/MarioWonder/SMBWMobile.ipa`). 
 
 **4. Install** the IPA with your sideloading tool (AltStore, Sideloadly, LiveContainer, …). The app gets the game's name, icon and version (the update's version, for example 1.2.1 for Mario Wonder; the base game's when there is no update).
 
+**Using Xcode with your own developer account:** add `--prepare-xcode` to the command instead of packing an IPA. Each game gets its own project, and the script adds it to `NxNative.xcworkspace` beside the game's folder. Open that workspace, choose the game's scheme, select your team under **Signing & Capabilities** with automatic signing enabled, choose your connected iPhone or iPad, and **Run**. Add more games the same way, optionally giving each a `--bundle-id`; switch games using Xcode's scheme menu. Existing bundle IDs and team selections are preserved when preparing again. Build products stay on the game's drive. See [the Xcode workflow](docs/development.md#build-and-run-on-a-device-with-xcode) for details.
+
+**Configuring several games:** copy [games.example.toml](games.example.toml) to your games drive as `games.local.toml`. Set the shared key path and each game's folder and optional bundle ID. Then run `python3 scripts/prepare_games.py --config "/external/games/games.local.toml" prepare engage` (or `prepare --all`). Developers keep their paths in their own config; no source edits are needed. `list` shows aliases and `check` validates paths without preparing anything. See [the configuration workflow](docs/development.md#configure-a-game-library).
+
 ## Play
 
 **Touch controls.** Tap **2D** / **3D** at the top to switch layouts; the app remembers your choice. Wonder, Engage, Dread, 13 Sentinels and Link's Awakening start in 2D, the other games in 3D. In 3D, the right stick (the camera in most games) is not drawn: swipe on the right third of the screen, starting anywhere off the buttons. In Super Mario Galaxy, other touches outside the controls move the pointer.
